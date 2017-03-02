@@ -1,0 +1,21 @@
+name: snapdiff
+version: '0.1'
+summary: Compare two snaps in the style of debdiff
+description: |
+  A little tool that takes two .snap files and prints files that are
+  only present in one of the snaps and diffs the metadata.
+
+grade: stable
+confinement: classic # use 'strict' once you have the right plugs and slots
+
+parts:
+  snapdiff:
+    plugin: dump
+    source: src
+    stage:
+      - snapdiff
+
+apps:
+  snapdiff:
+    command: snapdiff
+

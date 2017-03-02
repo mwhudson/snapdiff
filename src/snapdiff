@@ -1,0 +1,72 @@
+#!/usr/bin/perl -w
+
+use File::Temp qw/tempdir/;
+use File::Spec;
+use Cwd qw/cwd/;
+
+my %file_present;
+my @only_in_first;
+my @only_in_second;
+
+my $fh;
+
+open($fh, '-|', 'unsquashfs', '-lls', ${ARGV[0]});
+while (my $line = <$fh>) {
+    chomp($line);
+    if ($line =~ m%^(.*)squashfs-root/(.*)$%) {
+        $file_present{$2} = 1;
+    }
+}
+close($fh);
+
+open($fh, '-|', 'unsquashfs', '-lls', ${ARGV[1]});
+while (my $line = <$fh>) {
+    chomp($line);
+    if ($line =~ m%^(.*)squashfs-root/(.*)$%) {
+        if (defined($file_present{$2})) {
+            delete $file_present{$2};
+        } else {
+            push @only_in_second, "$1$2";
+        }
+    }
+}
+close($fh);
+
+open($fh, '-|', 'unsquashfs', '-lls', ${ARGV[0]});
+while (my $line = <$fh>) {
+    chomp($line);
+    if ($line =~ m%^(.*)squashfs-root/(.*)$%) {
+        if (defined($file_present{$2})) {
+            push @only_in_first, "$1$2";
+        }
+    }
+}
+close($fh);
+
+if (@only_in_first) {
+    print("Only in first snap, $ARGV[0]:\n\n");
+    foreach my $fname (@only_in_first) {
+        print($fname, "\n");
+    }
+    print("\n");
+}
+
+if (@only_in_second) {
+    print("Only in second snap, $ARGV[1]:\n\n");
+    foreach my $fname (@only_in_second) {
+        print($fname, "\n");
+    }
+    print("\n");
+}
+
+my $tmpdir = tempdir(CLEANUP => 1);
+open my $saveout, ">&STDOUT";
+open STDOUT, '>', File::Spec->devnull();
+system('unsquashfs', '-n', '-d', "$tmpdir/metax1", $ARGV[0], 'meta');
+system('unsquashfs', '-n', '-d', "$tmpdir/metax2", $ARGV[1], 'meta');
+open STDOUT, ">&", $saveout;
+rename("$tmpdir/metax1/meta", "$tmpdir/meta1");
+rename("$tmpdir/metax2/meta", "$tmpdir/meta2");
+chdir("$tmpdir");
+print("Differences in meta directory:\n\n");
+system('diff', '-Nur', "meta1", "meta2");
